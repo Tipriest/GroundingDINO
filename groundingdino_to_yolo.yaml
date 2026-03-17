@@ -1,0 +1,35 @@
+model:
+  config_path: groundingdino/config/GroundingDINO_SwinB_cfg.py
+  weights_path: weights/groundingdino_swinb_cogcoor.pth
+  device: cuda
+
+inference:
+  box_threshold: 0.35
+  text_threshold: 0.25
+  class_names:
+    - tree
+    - construction_barrel
+    - mail_box
+    - collapsed_fire_station
+    - collapsed_house
+    - collapsed_police_station
+    - suv
+    - water_tower
+    - washer
+    - ambulance
+
+data:
+  image_dir: /home/tipriest/Documents/MasterDegree/ros_tools_ws/src/ros_tools/video_frame_extractor/config/frames/采集待分割视频
+  output_dir: /home/tipriest/Documents/MasterDegree/smart-knight-eleme-comp2/data/gazebo/labels
+  recursive: false
+  extensions: ["jpg", "jpeg", "png", "bmp"]
+  copy_images: true
+  use_symlinks: false
+  skip_existing: true
+  split_ratio: 0.2
+  split_seed: 42
+  save_visualizations: true
+  vis_dir: visualizations
+
+yolo:
+  dataset_yaml: dataset.yaml
