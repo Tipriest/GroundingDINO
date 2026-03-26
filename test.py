@@ -2,7 +2,8 @@ from groundingdino.util.inference import load_model, load_image, predict, annota
 import cv2
 
 # Load model
-model = load_model("groundingdino/config/GroundingDINO_SwinB_cfg.py", "weights/groundingdino_swinb_cogcoor.pth")
+model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
+# model = load_model("groundingdino/config/GroundingDINO_SwinB_cfg.py", "weights/groundingdino_swinb_cogcoor.pth")
 
 # Test image and parameters
 IMAGE_PATH = ".asset/cat_dog.jpeg"  # Use sample image from repository
