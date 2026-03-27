@@ -7,20 +7,11 @@ inference:
   box_threshold: 0.35
   text_threshold: 0.25
   class_names:
-    - tree
-    - construction_barrel
-    - mail_box
-    - collapsed_fire_station
-    - collapsed_house
-    - collapsed_police_station
-    - suv
-    - water_tower
-    - washer
-    - ambulance
+    - rock
 
 data:
-  image_dir: /home/tipriest/Documents/MasterDegree/ros_tools_ws/src/ros_tools/video_frame_extractor/config/frames/采集待分割视频
-  output_dir: /home/tipriest/Documents/MasterDegree/smart-knight-eleme-comp2/data/gazebo/labels
+  image_dir: /home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/video_frame_extractor/frames/rgb
+  output_dir: /home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/video_frame_extractor/frames/rgb_groundingdino_label_result
   recursive: false
   extensions: ["jpg", "jpeg", "png", "bmp"]
   copy_images: true
