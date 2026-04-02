@@ -148,3 +148,5 @@ tmp/
 weights/
 
 groundingdino/version.py
+
+*.pt
