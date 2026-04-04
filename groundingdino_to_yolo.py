@@ -46,6 +46,27 @@ def split_list(items: List[str], ratio: float, seed: int) -> Tuple[List[str], Li
     return items[:split_idx], items[split_idx:]
 
 
+def split_list_three(
+    items: List[str],
+    val_ratio: float,
+    test_ratio: float,
+    seed: int,
+) -> Tuple[List[str], List[str], List[str]]:
+    if not items or val_ratio < 0 or test_ratio < 0 or (val_ratio + test_ratio) >= 1:
+        return items, [], []
+    rng = random.Random(seed)
+    items = items[:]
+    rng.shuffle(items)
+    total = len(items)
+    test_count = int(total * test_ratio)
+    val_count = int(total * val_ratio)
+    train_count = total - val_count - test_count
+    train_items = items[:train_count]
+    val_items = items[train_count : train_count + val_count]
+    test_items = items[train_count + val_count :]
+    return train_items, val_items, test_items
+
+
 def write_yolo_labels(label_path: str, class_ids: List[int], boxes: List[Tuple[float, float, float, float]]) -> None:
     lines = []
     for cls_id, (cx, cy, w, h) in zip(class_ids, boxes):
@@ -103,6 +124,7 @@ def main() -> None:
     image_dir = data_cfg.get("image_dir")
     train_dir = data_cfg.get("train_images")
     val_dir = data_cfg.get("val_images")
+    test_dir = data_cfg.get("test_images")
     output_dir = data_cfg.get("output_dir")
     if not output_dir:
         raise ValueError("data.output_dir is required")
@@ -112,7 +134,8 @@ def main() -> None:
     copy_images = bool(data_cfg.get("copy_images", True))
     use_symlinks = bool(data_cfg.get("use_symlinks", False))
     skip_existing = bool(data_cfg.get("skip_existing", True))
-    split_ratio = float(data_cfg.get("split_ratio", 0.0))
+    val_ratio = float(data_cfg.get("val_ratio", 0.0))
+    test_ratio = float(data_cfg.get("test_ratio", 0.0))
     split_seed = int(data_cfg.get("split_seed", 42))
     save_visualizations = bool(data_cfg.get("save_visualizations", False))
     vis_dir = data_cfg.get("vis_dir", "visualizations")
@@ -121,7 +144,12 @@ def main() -> None:
         all_images = collect_images(image_dir, recursive, extensions)
         if not all_images:
             raise ValueError(f"No images found in {image_dir}")
-        train_images, val_images = split_list(all_images, split_ratio, split_seed)
+        train_images, val_images, test_images = split_list_three(
+            all_images,
+            val_ratio,
+            test_ratio,
+            split_seed,
+        )
     else:
         if not train_dir:
             raise ValueError("data.image_dir or data.train_images is required")
@@ -131,22 +159,41 @@ def main() -> None:
         if val_dir:
             val_images = collect_images(val_dir, recursive, extensions)
         else:
-            train_images, val_images = split_list(train_images, split_ratio, split_seed)
+            val_images = []
+        if test_dir:
+            test_images = collect_images(test_dir, recursive, extensions)
+        else:
+            test_images = []
+        if not val_dir and not test_dir:
+            train_images, val_images, test_images = split_list_three(
+                train_images,
+                val_ratio,
+                test_ratio,
+                split_seed,
+            )
 
     output_images_train = os.path.join(output_dir, "images", "train")
     output_images_val = os.path.join(output_dir, "images", "val")
+    output_images_test = os.path.join(output_dir, "images", "test")
     output_labels_train = os.path.join(output_dir, "labels", "train")
     output_labels_val = os.path.join(output_dir, "labels", "val")
+    output_labels_test = os.path.join(output_dir, "labels", "test")
     output_vis_train = os.path.join(output_dir, vis_dir, "train")
     output_vis_val = os.path.join(output_dir, vis_dir, "val")
+    output_vis_test = os.path.join(output_dir, vis_dir, "test")
 
     ensure_dir(output_images_train)
     ensure_dir(output_images_val)
     ensure_dir(output_labels_train)
     ensure_dir(output_labels_val)
+    if test_images:
+        ensure_dir(output_images_test)
+        ensure_dir(output_labels_test)
     if save_visualizations:
         ensure_dir(output_vis_train)
         ensure_dir(output_vis_val)
+        if test_images:
+            ensure_dir(output_vis_test)
 
     model = load_model(model_config_path, weights_path, device=device)
     caption = ". ".join(class_names)
@@ -156,10 +203,14 @@ def main() -> None:
             images_dir = output_images_train
             labels_dir = output_labels_train
             vis_dir_local = output_vis_train
-        else:
+        elif split_name == "val":
             images_dir = output_images_val
             labels_dir = output_labels_val
             vis_dir_local = output_vis_val
+        else:
+            images_dir = output_images_test
+            labels_dir = output_labels_test
+            vis_dir_local = output_vis_test
 
         for image_path in tqdm(images, desc=f"Processing {split_name}"):
             base_name = os.path.splitext(os.path.basename(image_path))[0]
@@ -207,6 +258,8 @@ def main() -> None:
     process_split(train_images, "train")
     if val_images:
         process_split(val_images, "val")
+    if test_images:
+        process_split(test_images, "test")
 
     dataset_yaml_name = yolo_cfg.get("dataset_yaml", "dataset.yaml")
     dataset_yaml_path = os.path.join(output_dir, dataset_yaml_name)
@@ -216,6 +269,8 @@ def main() -> None:
         "val": "images/val",
         "names": class_names,
     }
+    if test_images:
+        dataset_yaml["test"] = "images/test"
     with open(dataset_yaml_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(dataset_yaml, f, allow_unicode=False, sort_keys=False)
 

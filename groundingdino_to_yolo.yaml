@@ -7,17 +7,20 @@ inference:
   box_threshold: 0.35
   text_threshold: 0.25
   class_names:
-    - rock
+    - grassland
+    - road
+    - rivers
 
 data:
-  image_dir: /home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/video_frame_extractor/frames/rgb
-  output_dir: /home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/video_frame_extractor/frames/rgb_groundingdino_label_result
+  image_dir: /data/self_make/water_world2026-04-04_19-25-25/p02_Frames/rgb
+  output_dir: /data/self_make/water_world2026-04-04_19-25-25/p03_Grounding-DINO-First-Detection-Dataset
   recursive: false
   extensions: ["jpg", "jpeg", "png", "bmp"]
   copy_images: true
   use_symlinks: false
   skip_existing: true
-  split_ratio: 0.2
+  val_ratio: 0.2
+  test_ratio: 0.1
   split_seed: 42
   save_visualizations: true
   vis_dir: visualizations
