@@ -4,6 +4,7 @@
 import os
 import random
 import shutil
+import re
 from glob import glob
 from typing import Dict, List, Tuple
 
@@ -94,11 +95,63 @@ def normalize_box(box: List[float]) -> Tuple[float, float, float, float]:
     return cx, cy, w, h
 
 
+def color_for_class(class_id: int) -> Tuple[int, int, int]:
+    palette = [
+        (255, 59, 48),
+        (255, 149, 0),
+        (255, 204, 0),
+        (52, 199, 89),
+        (48, 176, 199),
+        (64, 156, 255),
+        (88, 86, 214),
+        (175, 82, 222),
+    ]
+    return palette[class_id % len(palette)]
+
+
+def draw_annotations(image, boxes, labels, class_ids) -> None:
+    if image is None:
+        return
+    height, width = image.shape[:2]
+    for box, label, class_id in zip(boxes, labels, class_ids):
+        cx, cy, w, h = normalize_box(box)
+        x1 = int((cx - 0.5 * w) * width)
+        y1 = int((cy - 0.5 * h) * height)
+        x2 = int((cx + 0.5 * w) * width)
+        y2 = int((cy + 0.5 * h) * height)
+        x1 = max(0, min(width - 1, x1))
+        y1 = max(0, min(height - 1, y1))
+        x2 = max(0, min(width - 1, x2))
+        y2 = max(0, min(height - 1, y2))
+        color = color_for_class(class_id)
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        if label:
+            cv2.putText(image, label, (x1, max(15, y1 - 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2,
+                        cv2.LINE_AA)
+
+
+def normalize_phrase(text: str) -> str:
+    text = str(text).strip().lower().replace("_", " ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split())
+
+
+def match_class_name(phrase: str, class_names: List[str]) -> str:
+    if phrase in class_names:
+        return phrase
+    for name in class_names:
+        pattern = rf"(?:^|\b){re.escape(name)}(?:\b|$)"
+        if re.search(pattern, phrase):
+            return name
+    return ""
+
+
 def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="GroundingDINO to YOLO dataset")
-    parser.add_argument("-c", "--config", default="./groundingdino_to_yolo.yaml", help="Path to config YAML")
+    parser.add_argument("-c", "--config", default="/home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/third_party/GroundingDINO/groundingdino_to_yolo.yaml", help="Path to config YAML")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -108,15 +161,21 @@ def main() -> None:
     infer_cfg = cfg.get("inference", {})
     yolo_cfg = cfg.get("yolo", {})
 
-    model_config_path = model_cfg.get("config_path", "groundingdino/config/GroundingDINO_SwinB_cfg.py")
-    weights_path = model_cfg.get("weights_path", "weights/groundingdino_swinb_cogcoor.pth")
+    model_config_path = model_cfg.get("config_path", "/home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/third_party/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py")
+    weights_path = model_cfg.get("weights_path", "/home/tipriest/Documents/MasterDegree/auto_yolo_label_ws/src/auto_yolo_label/third_party/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
     device = model_cfg.get("device", "cuda")
 
     class_names = infer_cfg.get("class_names", [])
+    for class_name in class_names:
+        print(f"class_name: {class_name}")
     if not class_names:
         raise ValueError("inference.class_names is required")
     class_names = [str(x).strip().lower() for x in class_names]
+    print("-"*60)
+    for class_name in class_names:
+        print(f"class_name: {class_name}")
     class_to_id = {name: idx for idx, name in enumerate(class_names)}
+    class_names_sorted = sorted(class_names, key=len, reverse=True)
 
     box_threshold = float(infer_cfg.get("box_threshold", 0.35))
     text_threshold = float(infer_cfg.get("text_threshold", 0.25))
@@ -198,6 +257,7 @@ def main() -> None:
     model = load_model(model_config_path, weights_path, device=device)
     caption = ". ".join(class_names)
 
+
     def process_split(images: List[str], split_name: str) -> None:
         if split_name == "train":
             images_dir = output_images_train
@@ -230,15 +290,20 @@ def main() -> None:
 
             class_ids: List[int] = []
             yolo_boxes: List[Tuple[float, float, float, float]] = []
-            for box, phrase in zip(boxes.tolist(), phrases):
-                label = str(phrase).strip().lower()
-                if label not in class_to_id:
+            keep_indices: List[int] = []
+            keep_phrases: List[str] = []
+            for idx, (box, phrase) in enumerate(zip(boxes.tolist(), phrases)):
+                normalized = normalize_phrase(phrase)
+                label = match_class_name(normalized, class_names_sorted)
+                if not label:
                     continue
                 cx, cy, w, h = normalize_box(box)
                 if w <= 0 or h <= 0:
                     continue
                 class_ids.append(class_to_id[label])
                 yolo_boxes.append((cx, cy, w, h))
+                keep_indices.append(idx)
+                keep_phrases.append(label)
 
             write_yolo_labels(label_path, class_ids, yolo_boxes)
 
@@ -246,12 +311,12 @@ def main() -> None:
             place_image(image_path, dst_image, copy_images, use_symlinks)
 
             if save_visualizations:
-                annotated = annotate(
-                    image_source=image_source,
-                    boxes=boxes,
-                    logits=logits,
-                    phrases=phrases,
-                )
+                annotated = image_source.copy()
+                if keep_indices:
+                    sel_boxes = [boxes[i].tolist() for i in keep_indices]
+                    sel_class_ids = class_ids
+                    draw_annotations(annotated, sel_boxes, keep_phrases,
+                                     sel_class_ids)
                 vis_path = os.path.join(vis_dir_local, f"{base_name}.jpg")
                 cv2.imwrite(vis_path, annotated)
 

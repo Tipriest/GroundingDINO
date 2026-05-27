@@ -7,13 +7,22 @@ inference:
   box_threshold: 0.35
   text_threshold: 0.25
   class_names:
-    - grassland
-    - road
-    - rivers
+    - wooden walkway
+    - asphalt road
+    - concrete pavement
+    # - grassy mixed soil area
+    - forest ground
+    # - forest
+    # - dirt ground
+    # - brown wodden road
+    # - people
+    # - soil and grass
+    # - gray concrete road
+    # - Dark red concrete road
 
 data:
-  image_dir: /data/self_make/water_world2026-04-04_19-25-25/p02_Frames/rgb
-  output_dir: /data/self_make/water_world2026-04-04_19-25-25/p03_Grounding-DINO-First-Detection-Dataset
+  image_dir: /data/self_make/realdog_05052026-05-05_20-17-14/p02_Frames/rgb_2026-05-05_20-19-53
+  output_dir: /data/self_make/realdog_05052026-05-05_20-17-14/p03_Grounding-DINO-First-Detection-Dataset
   recursive: false
   extensions: ["jpg", "jpeg", "png", "bmp"]
   copy_images: true
